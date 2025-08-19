@@ -7,6 +7,7 @@
 #include <vector>
 #include <sstream>
 #include <array>
+#include <chrono>
 
 class ChessPosition {
 private:
@@ -306,8 +307,8 @@ public:
         std::string line;
         while ((line = readLine()) != "uciok" && !line.empty()) {}
 
-        sendCommand("setoption name Threads value 14");
-        sendCommand("setoption name Hash value 1024");
+        sendCommand("setoption name Threads value 16");
+        sendCommand("setoption name Hash value 16384");
 
         sendCommand("isready");
         while ((line = readLine()) != "readyok" && !line.empty()) {}
@@ -347,46 +348,53 @@ public:
 
     double* evaluate(bool isWhiteToMove = true) {
         sendCommand("go perft 1");
-        int moveCount = 0;
-        int empty = 0;
 
-        std::string line = readLine();
+        /*
+            In the current version of stockfish, excuting the command {go perft 1}, outputs all the legal moves in the position.
+            The following chunk of code is utilizing the formate of the stockfish output to count the legal moves
+
+            e.g:
+
+            go perft 1
+            info string Available processors: 0-7
+            info string Using 1 thread
+            info string NNUE evaluation using nn-1c0000000000.nnue (133MiB, (22528, 3072, 15, 32, 1))
+            info string NNUE evaluation using nn-37f18f62d772.nnue (6MiB, (22528, 128, 15, 32, 1))
+            a2a3: 1
+            b2b3: 1
+            d2d3: 1
+            ...
+
+            Nodes searched: 30
+
+
+            ":" appears in the text by 1 + the number of moves.
+        */
         
+        std::string text = "";
+        std::string line = readLine();
+        int count = 0;
+
         while (true) {
             line = readLine();
 
-            // std::cout << line << std::endl;
-             std::string key = "Nodes searched: ";
-            size_t pos = line.find(key);
+            text += line;
 
-            if (pos != std::string::npos) {
-                // Move the position past the key
-                pos += key.length();
-
-                // Extract the number after the key
-                std::istringstream iss(line.substr(pos));
-                int nodes = 0;
-                iss >> nodes;
-                moveCount = nodes;
-                //std::cout << "Nodes searched!!!: " << nodes << std::endl;
-
+            if (line.empty() || line == "") {
                 break;
-            }
-            else {
-                //std::cout << "Key not found in the string." << std::endl;
             }
         }
        
-
             
+        for (char c : text) {
+            if (c == ':') {
+                count++;
+            }
+        }
 
-        
+        double* arr = new double[2];
 
-        
-
-        double* arr = new double[3];
-
-        arr[1] = moveCount;
+        arr[1] = count-1;
 
         sendCommand("go depth 20");
         int evalScore = 0; // Evaluation in centipawns (1/100th of a pawn).
@@ -461,6 +469,7 @@ public:
             std::string line = readLine();
             if (line.find("Fen: ") != std::string::npos) {
                 fenLine = line.substr(line.find("Fen: ") + 5); // extract after "Fen: "
+                // std::cout << fenLine << std::endl;
                 return fenLine;
             }
         }
@@ -631,19 +640,22 @@ public:
         std::cout << "Total moves: " << game.moves.size() << std::endl;
         std::cout << std::string(80, '=') << std::endl;
 
+
         // Initialize chess position
         ChessPosition position;
 
         // Start from initial position
-        std::string moveSeq = "position startpos";
+        std::string moveSeq = "position startpos moves";
 
         // Get initial position evaluation
         engine.sendCommand(moveSeq);
         double* result = engine.evaluate();
-        double evalBefore = result[0];
-        double legalMovesBefore = result[1];
+        double evalBefore = 0;
         bool isCheckBefore = position.isInCheck(true); // White starts
-        std::string fenBefore = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        double legalMovesBefore = 20;
+        double legalMovesAfter = 20;
+        std::string fenBefore = "startup";
+        std::string fenAfter = "";
 
 
         for (size_t i = 0; i < game.moves.size(); ++i) {
@@ -658,13 +670,13 @@ public:
             // Apply the move to Stockfish
             moveSeq += " " + game.moves[i];
             engine.sendCommand(moveSeq);
-
+            fenAfter = engine.getFenPosition();
             
 
             // Get evaluation after the move
             double* result = engine.evaluate(isWhiteMove);
             double evalAfter = result[0];
-            double legalMovesAfter = result[1];
+            legalMovesAfter = result[1];
 
             // Check if king is in check after the move
             bool isCheckAfter = false;
@@ -681,7 +693,12 @@ public:
             if (isWhiteMove && i / 2 < game.whiteTimestamps.size()) {
                 size_t whiteIndex = i / 2;
 
-                timeSpent = game.whiteTimestamps[whiteIndex] - game.whiteTimestamps[whiteIndex + 1];
+                if (whiteIndex == 0) {
+                    timeSpent = 1800 - game.whiteTimestamps[whiteIndex + 1];
+                }
+                else {
+                    timeSpent = game.whiteTimestamps[whiteIndex - 1] - game.whiteTimestamps[whiteIndex];
+                }
 
                 if (whiteIndex == 0) {
                     timeRemaining = game.whiteTimestamps[0];
@@ -700,7 +717,12 @@ public:
             else if (!isWhiteMove && i / 2 < game.blackTimestamps.size()) {
                 size_t blackIndex = i / 2;
 
-                timeSpent = game.blackTimestamps[blackIndex] - game.blackTimestamps[blackIndex + 1];
+                if (blackIndex == 0) {
+                    timeSpent = 1800 - game.blackTimestamps[blackIndex];
+                }
+                else {
+                    timeSpent = game.blackTimestamps[blackIndex - 1] - game.blackTimestamps[blackIndex];
+                }
 
                 if (blackIndex == 0) {
                     timeRemaining = game.blackTimestamps[0];
@@ -720,60 +742,43 @@ public:
             timeSpent = timeSpent * 0.1;
             timeSpentOnMoveBeforeIt = timeSpentOnMoveBeforeIt * 0.1;
 
-            // Display move analysis
-           // std::cout << std::setw(3) << (i + 1) << ". "
-             //   << std::setw(8) << game.moves[i]
-               // << " (" << (isWhiteMove ? "White" : "Black") << ") ";
-
-            // Show evaluation before
-            // std::cout << "Before: ";
-            if (abs(evalBefore) > 500) {
-               // std::cout << (evalBefore > 0 ? "+M" : "-M");
-            }
-            else {
-                // std::cout << std::showpos << std::fixed << std::setprecision(2) << evalBefore;
-            }
-
-            // Show evaluation after
-            // std::cout << std::noshowpos << " | After: ";
-            if (abs(evalAfter) > 500) {
-                // std::cout << (evalAfter > 0 ? "+M" : "-M");
-            }
-            else {
-               // std::cout << std::showpos << std::fixed << std::setprecision(2) << evalAfter;
-            }
-
             bool kingSideCastle = position.kingSideCastle();
-            std::string fen = engine.getFenPosition();
+            bool queenSideCastle = position.queenSideCastle();
 
             // Show check status
+            
             /*
-            std::cout << " | Fen Before: " << fenBefore;
-            std::cout << std::noshowpos << " | Fen After: " << fen;
+            std::cout << std::noshowpos << " | Fen Before: " << fenBefore;
+            std::cout << std::noshowpos << " | Fen After: " << fenAfter;
             std::cout << std::noshowpos << " | Check Before: " << (isCheckBefore ? "true" : "false");
-            std::cout << " | Check After: " << (isCheckAfter ? "true" : "false");
-            std::cout << " | Delta Eval" << evalBefore - evalAfter;
-            std::cout << " | Eval Before" << evalBefore;
-            std::cout << " | Eval After" << evalAfter;
-            std::cout << " | Time: " << std::setw(3) << timeRemaining << "ms";
-            std::cout << " | Time Spent on previous move: " << std::setw(3) << timeSpentOnMoveBeforeIt << "s";
-             std::cout << " | Legal Moves Before: " << legalMovesBefore;
-             std::cout << " | Legal Moves After: " << legalMovesAfter << std::endl;
+            std::cout << std::noshowpos << " | Check After: " << (isCheckAfter ? "true" : "false");
+            std::cout << std::noshowpos << " | Delta Eval" << evalBefore - evalAfter;
+            std::cout << std::noshowpos << " | Eval Before" << evalBefore;
+            std::cout << std::noshowpos << " | Eval After" << evalAfter;
+            std::cout << std::noshowpos << " | Time: " << std::setw(3) << timeRemaining << "ms";
+            std::cout << std::noshowpos << " | Time Spent on previous move: " << std::setw(3) << timeSpentOnMoveBeforeIt << "s";
+             std::cout << std::noshowpos << " | Legal Moves Before: " << legalMovesBefore;
+             std::cout << std::noshowpos << " | Legal Moves After: " << legalMovesAfter << std::endl;
             */
 
-             std::ofstream file("analyzed.csv", std::ios::app); // Open in append mode
+            // std::cout << legalMovesBefore << "," << legalMovesAfter << std::endl;
+
+             std::ofstream file("analyzed_game_information.csv", std::ios::app); // Open in append mode
              if (!file) {
-                 std::cerr << "Error: Could not open file " << "analyzed.csv" << std::endl;
+                 std::cerr << "Error: Could not open file " << "analyzed_game_information.csv" << std::endl;
                  return;
              }
-             file << i << "," << (isCheckBefore ? 1 : 0) << "," << (isCheckAfter ? 1 : 0) << "," << evalAfter - evalBefore << "," << evalBefore << "," << evalAfter << "," << timeRemaining * 0.1 << "," << timeSpentOnMoveBeforeIt << "," << legalMovesBefore << "," << legalMovesAfter << "," << timeSpent << fenBefore << "," << fen << "\n";
+
+             file << i+1 << "," << (kingSideCastle ? 1 : 0) << "," << (queenSideCastle ? 1 : 0) << "," << (isCheckBefore ? 1 : 0) << "," << (isCheckAfter ? 1 : 0) << "," << evalAfter - evalBefore << "," << evalBefore << "," << evalAfter << "," << timeRemaining * 0.1 << "," << timeSpentOnMoveBeforeIt * 0.1 << "," << legalMovesBefore << "," << legalMovesAfter << "," << timeSpent << "," << fenBefore << "," << fenAfter << "," << "\n";
              file.close();
 
             // Update for next iteration
             evalBefore = evalAfter;
+            evalAfter = 0.0;
             isCheckBefore = isCheckAfter;
-            fenBefore = fen;
+            fenBefore = fenAfter;
             legalMovesBefore = legalMovesAfter;
+            legalMovesAfter = 20;
         }
 
         std::cout << std::string(80, '=') << std::endl;
@@ -791,15 +796,17 @@ int main() {
         return 1;
     }
 
-    
-
     std::cout << "Stockfish ready!" << std::endl;
 
+    std::cout << "\nWhich file should this machine analyze: ";
+    std::string input;
+    std::getline(std::cin, input);
+
     // Parse games from JSON file
-    auto games = analyzer.parseGameFile("C:\\Users\\Win11\\source\\repos\\CMakeProject3\\CMakeProject3\\game_data.json");
+    auto games = analyzer.parseGameFile("C:\\Users\\Win11\\source\\repos\\CMakeProject3\\CMakeProject3\\game_information" + input + ".json");
 
     if (games.empty()) {
-        std::cout << "No games found in game_data.json" << std::endl;
+        std::cout << "No games found in game_information" + input + ".json" << std::endl;
         return 1;
     }
 
@@ -807,9 +814,20 @@ int main() {
 
     // Analyze each game
     for (const auto& game : games) {
+        auto start_time = std::chrono::high_resolution_clock::now();
+
         analyzer.analyzeGame(game);
 
         /*
+        auto end_time = std::chrono::high_resolution_clock::now();
+
+        auto duration = end_time - start_time;
+
+        std::cout << "Execution time: "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()
+            << " ms" << std::endl;
+
+        
         std::cout << "\nPress Enter to analyze next game (or 'q' to quit): ";
         std::string input;
         std::getline(std::cin, input);
@@ -817,6 +835,8 @@ int main() {
             break;
         }
         */
+        
+        
     }
 
     return 0;
