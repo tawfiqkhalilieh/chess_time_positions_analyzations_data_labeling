@@ -396,8 +396,47 @@ public:
 
         arr[1] = count-1;
 
+        // NOTE: The vision was to go to depth 20-22 ( which are commonly used in game reviews ) but for the lack of the power of calculation and for the main purpose of the project ( to be shipped fast ), unfourtunately, I had to limit the depth to 10. 
         sendCommand("go depth 10");
-        int evalScore = 0; // Evaluation in centipawns (1/100th of a pawn).
+        /*
+        In this section, I'm using a similar trick to the one I used in the previous section.
+
+        Stockfish 17.1 by the Stockfish developers (see AUTHORS file)
+        position set 1N6/p2k1pp1/7p/2p5/3b1P2/8/P5PP/2R2K2 b - - 0 30
+        go depth 25
+        info string Available processors: 0-11
+        info string Using 1 thread
+        info string NNUE evaluation using nn-1c0000000000.nnue (133MiB, (22528, 3072, 15, 32, 1))
+        info string NNUE evaluation using nn-37f18f62d772.nnue (6MiB, (22528, 128, 15, 32, 1))
+        info depth 1 seldepth 2 multipv 1 score cp 17 nodes 20 nps 6666 hashfull 0 tbhits 0 time 3 pv e2e4
+        info depth 2 seldepth 3 multipv 1 score cp 34 nodes 45 nps 11250 hashfull 0 tbhits 0 time 4 pv e2e4
+        info depth 3 seldepth 4 multipv 1 score cp 42 nodes 72 nps 18000 hashfull 0 tbhits 0 time 4 pv e2e4
+        info depth 4 seldepth 7 multipv 1 score cp 39 nodes 512 nps 102400 hashfull 0 tbhits 0 time 5 pv g1f3 d7d5 d2d4
+        info depth 5 seldepth 7 multipv 1 score cp 58 nodes 609 nps 121800 hashfull 0 tbhits 0 time 5 pv e2e4
+        info depth 6 seldepth 8 multipv 1 score cp 57 nodes 752 nps 125333 hashfull 0 tbhits 0 time 6 pv e2e4 d7d5 e4d5 d8d5 g1f3
+        info depth 7 seldepth 10 multipv 1 score cp 46 nodes 2019 nps 252375 hashfull 0 tbhits 0 time 8 pv e2e4 c7c5 d2d4 c5d4 g1f3
+        info depth 8 seldepth 13 multipv 1 score cp 47 nodes 3436 nps 343600 hashfull 1 tbhits 0 time 10 pv e2e4 c7c5 b1c3 b8c6 g1f3 g8f6
+        info depth 9 seldepth 13 multipv 1 score cp 94 nodes 4748 nps 395666 hashfull 1 tbhits 0 time 12 pv e2e4 c7c5 g1f3 b8c6 b1c3 b7b6
+        info depth 10 seldepth 17 multipv 1 score cp 40 nodes 8620 nps 507058 hashfull 2 tbhits 0 time 17 pv e2e4 c7c5 g1f3 b8c6 b1c3 g8f6 d2d4 c5d4 f3d4 e7e6 d4c6 b7c6
+        info depth 11 seldepth 17 multipv 1 score cp 41 nodes 15172 nps 561925 hashfull 4 tbhits 0 time 27 pv e2e4 c7c5 g1f3 e7e6 b1c3 b8c6 d2d4 c5d4 f3d4 g8f6 a2a3 f8e7 d4c6 d7c6
+        info depth 12 seldepth 19 multipv 1 score cp 33 nodes 34187 nps 633092 hashfull 12 tbhits 0 time 54 pv e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 f3d4 g8f6 d4c6 d7c6 d1d8 e8d8 f1d3 f8b4 c2c3
+        info depth 13 seldepth 17 multipv 1 score cp 35 nodes 37544 nps 625733 hashfull 12 tbhits 0 time 60 pv e2e4 e7e5 b1c3 b8c6 g1f3 f8b4 d2d4 e5d4 f3d4 g8f6 d4c6 d7c6 d1d8 e8d8
+        info depth 14 seldepth 19 multipv 1 score cp 40 nodes 50495 nps 631187 hashfull 17 tbhits 0 time 80 pv e2e4 e7e5 g1f3 g8f6 b1c3 d7d6 d2d4 e5d4 d1d4 f8e7
+        info depth 15 seldepth 18 multipv 1 score cp 39 nodes 64450 nps 625728 hashfull 21 tbhits 0 time 103 pv e2e4 e7e5 g1f3 g8f6 d2d4 f6e4 d4e5 d7d5 f1d3 b8c6 e1g1 c8e6 b1c3 e4c3 b2c3
+        info depth 16 seldepth 20 multipv 1 score cp 37 nodes 80751 nps 616419 hashfull 27 tbhits 0 time 131 pv e2e4 e7e5 g1f3 g8f6 d2d4 f6e4 f3e5 d7d5 b1d2 b8d7 d2e4 d5e4 d1h5 g7g6 h5e2 d7e5 e2e4 f8g7 d4e5
+        info depth 17 seldepth 23 multipv 1 score cp 37 nodes 100673 nps 621438 hashfull 34 tbhits 0 time 162 pv e2e4 e7e5 g1f3 g8f6 b1c3 d7d6 d2d4 e5d4 f3d4 f8e7 f1b5 c7c6 b5d3 e8g8 e1g1 c6c5 d4f3 b8c6
+        info depth 18 seldepth 28 multipv 1 score cp 30 nodes 242639 nps 636847 hashfull 94 tbhits 0 time 381 pv e2e4 e7e5 g1f3 b8c6 f1e2 d7d5 e4d5 d8d5 d2d3 c8e6 e1g1 f8d6 f1e1 h7h6
+        info depth 19 seldepth 27 multipv 1 score cp 40 nodes 294310 nps 642598 hashfull 109 tbhits 0 time 458 pv e2e4 e7e5 g1f3 g8f6 f3e5 d7d6 e5f3 f6e4 d2d4 d6d5 f1d3 f8b4 c2c3 b4d6 e1g1 e8g8 c3c4 c7c6 d1c2 b8a6 d3e4 d5e4 c2e4 f8e8
+        info depth 20 seldepth 33 multipv 1 score cp 40 nodes 356864 nps 652402 hashfull 127 tbhits 0 time 547 pv e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f6e4 d2d4 f8e7 f1e1 b7b5 e1e4 b5a4 d4e5
+        info depth 21 seldepth 35 multipv 1 score cp 40 nodes 693162 nps 638858 hashfull 257 tbhits 0 time 1085 pv e2e4 e7e5 g1f3 b8c6 d2d4 e5d4 f3d4 g8f6 d4c6 d7c6 d1d8 e8d8 b1c3 d8e8 c1d2 a7a5 a2a3 f8d6 f2f4
+        info depth 22 seldepth 29 multipv 1 score cp 38 nodes 753875 nps 638336 hashfull 279 tbhits 0 time 1181 pv e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f8e7 f1e1 b7b5 a4b3 e8g8 c2c3 c6a5 b3c2 d7d5 d2d4 e5d4 e4d5 f8e8 c3d4 c8b7 b1c3 f6d5
+        info depth 23 seldepth 31 multipv 1 score cp 34 nodes 901681 nps 644057 hashfull 329 tbhits 0 time 1400 pv e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f8e7 d2d3 b7b5 a4b3 d7d6 a2a4 c6a5 a4b5 a5b3 c2b3 e8g8 h2h3 c8b7
+        info depth 24 seldepth 32 multipv 1 score cp 36 nodes 1179519 nps 649514 hashfull 426 tbhits 0 time 1816 pv e2e4 e7e5 g1f3 b8c6 f1b5 a7a6 b5a4 g8f6 e1g1 f6e4 d2d4 b7b5 a4b3 d7d5 d4e5 c8e6 b1d2 e4c5 c2c3 c5b3 d2b3 f8e7 f3d4 c6d4 b3d4
+        info depth 25 seldepth 35 multipv 1 score cp 24 nodes 2042808 nps 635596 hashfull 668 tbhits 0 time 3214 pv e2e4 e7e5 g1f3 b8c6 f1b5 g8f6 e1g1 f6e4 f1e1 e4d6 f3e5 f8e7 b5f1 d6f5 e5f3 c6d4 c2c3 d4f3 d1f3 d7d6 d2d4 e8g8 f1d3 f5h4 f3e2 f8e8 g2g3 h4g6 h2h4 c7c6 h4h5 g6f8 h5h6 g7g6
+        bestmove e2e4 ponder e7e5 <<- Look at the line above it!
+        */
+        
+        int evalScore = 0;
         bool mateFound = false;
         int mateIn = 0;
 
@@ -405,11 +444,6 @@ public:
         // Read lines until we see "bestmove", which signals the end of the search.
         while (true) {
             std::string line = readLine();
-            // std::cout << line << std::endl;
-            // It's useful to print all output for debugging.
-            // if (!line.empty()) {
-            //     std::cout << "Stockfish: " << line << std::endl;
-            // }
 
             // Look for evaluation in centipawns (e.g., "info ... score cp 135 ...")
             std::size_t cpPos = line.find("score cp ");
@@ -435,13 +469,11 @@ public:
         }
 
         // --- Print the final evaluation ---
+        /*
+
+
+        NOTE: might be used later - this code divides the evaluation score by 100 to convert centipawns to pawns ( the metric used by chess.com ) 
         if (mateFound) {
-
-            /*std::cout << "\n--- Final Result ---" << std::endl;
-            std::cout << "Mate in " << mateIn << " moves" << std::endl;
-            */
-            // return 20; // 20 out if 10 is mate
-
             arr[0] = 25;
         }
         else {
@@ -450,17 +482,14 @@ public:
             if (pawnValue > 25) {
                 pawnValue = 25;
             }
-            /*
             
-            std::cout << "\n--- Final Result ---" << std::endl;
-            std::cout << "Evaluation: " << pawnValue << " pawns" << std::endl;
-            std::cout << "(Positive is good for White, Negative is good for Black)" << std::endl;
-            */
             // return pawnValue;
             arr[0] = pawnValue;
         }
+        */
+        
 
-        // arr[0] = evalScore;
+        arr[0] = evalScore;
         return arr;
 
     }
@@ -752,24 +781,6 @@ public:
             bool kingSideCastle = position.kingSideCastle();
             bool queenSideCastle = position.queenSideCastle();
 
-            // Show check status
-            
-            /*
-            std::cout << std::noshowpos << " | Fen Before: " << fenBefore;
-            std::cout << std::noshowpos << " | Fen After: " << fenAfter;
-            std::cout << std::noshowpos << " | Check Before: " << (isCheckBefore ? "true" : "false");
-            std::cout << std::noshowpos << " | Check After: " << (isCheckAfter ? "true" : "false");
-            std::cout << std::noshowpos << " | Delta Eval" << evalBefore - evalAfter;
-            std::cout << std::noshowpos << " | Eval Before" << evalBefore;
-            std::cout << std::noshowpos << " | Eval After" << evalAfter;
-            std::cout << std::noshowpos << " | Time: " << std::setw(3) << timeRemaining << "ms";
-            std::cout << std::noshowpos << " | Time Spent on previous move: " << std::setw(3) << timeSpentOnMoveBeforeIt << "s";
-             std::cout << std::noshowpos << " | Legal Moves Before: " << legalMovesBefore;
-             std::cout << std::noshowpos << " | Legal Moves After: " << legalMovesAfter << std::endl;
-            */
-
-            // std::cout << legalMovesBefore << "," << legalMovesAfter << std::endl;
-
              std::ofstream file("analyzed_game_information.csv", std::ios::app); // Open in append mode
              if (!file) {
                  std::cerr << "Error: Could not open file " << "analyzed_game_information.csv" << std::endl;
@@ -786,16 +797,6 @@ public:
             fenBefore = fenAfter;
             legalMovesBefore = legalMovesAfter;
             legalMovesAfter = 20;
-
-            /*
-            auto end_time = std::chrono::high_resolution_clock::now();
-
-            auto duration = end_time - start_time;
-
-            std::cout << "Execution time: "
-                << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()
-                << " ms" << std::endl;
-            */
         }
 
         std::cout << std::string(80, '=') << std::endl;
@@ -816,7 +817,6 @@ int main() {
     std::cout << "Stockfish ready!" << std::endl;
 
     for (int i = 0; i < 78; i++) {
-        
         // Parse games from JSON file
         auto games = analyzer.parseGameFile("game_information" + std::to_string(i) + ".json");
 
@@ -829,15 +829,9 @@ int main() {
 
         // Analyze each game
         for (const auto& game : games) {
-
-
             analyzer.analyzeGame(game);
-
-
         }
 
     }
-    
-
     return 0;
 }
