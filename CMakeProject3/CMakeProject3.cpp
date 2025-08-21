@@ -274,7 +274,7 @@ public:
         }
     }
 
-    bool init(const std::string& path = "C:\\Users\\Win11\\source\\repos\\CMakeProject3\\CMakeProject3\\stockfish.exe") {
+    bool init(const std::string& path = "stockfish.exe") {
         SECURITY_ATTRIBUTES saAttr = { sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE };
         HANDLE hChildStdinRd, hChildStdoutWr;
 
@@ -396,7 +396,7 @@ public:
 
         arr[1] = count-1;
 
-        sendCommand("go depth 20");
+        sendCommand("go depth 10");
         int evalScore = 0; // Evaluation in centipawns (1/100th of a pawn).
         bool mateFound = false;
         int mateIn = 0;
@@ -442,11 +442,14 @@ public:
             */
             // return 20; // 20 out if 10 is mate
 
-            arr[0] = 20;
+            arr[0] = 25;
         }
         else {
             // Convert centipawns to a more human-readable pawn value.
             double pawnValue = evalScore / 100.0;
+            if (pawnValue > 25) {
+                pawnValue = 25;
+            }
             /*
             
             std::cout << "\n--- Final Result ---" << std::endl;
@@ -457,7 +460,7 @@ public:
             arr[0] = pawnValue;
         }
 
-        arr[0] = evalScore;
+        // arr[0] = evalScore;
         return arr;
 
     }
@@ -659,6 +662,10 @@ public:
 
 
         for (size_t i = 0; i < game.moves.size(); ++i) {
+
+
+            // auto start_time = std::chrono::high_resolution_clock::now();
+            
             // Determine whose move it is
             bool isWhiteMove = (i % 2 == 0);
 
@@ -779,6 +786,16 @@ public:
             fenBefore = fenAfter;
             legalMovesBefore = legalMovesAfter;
             legalMovesAfter = 20;
+
+            /*
+            auto end_time = std::chrono::high_resolution_clock::now();
+
+            auto duration = end_time - start_time;
+
+            std::cout << "Execution time: "
+                << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()
+                << " ms" << std::endl;
+            */
         }
 
         std::cout << std::string(80, '=') << std::endl;
@@ -788,7 +805,7 @@ public:
 int main() {
     GameAnalyzer analyzer;
 
-    std::cout << "Chess Game Analyzer with Check Detection (Depth 20)" << std::endl;
+    std::cout << "Chess Game Analyzer with Check Detection (Depth 11)" << std::endl;
     std::cout << "=================================================" << std::endl;
 
     if (!analyzer.init()) {
@@ -798,46 +815,29 @@ int main() {
 
     std::cout << "Stockfish ready!" << std::endl;
 
-    std::cout << "\nWhich file should this machine analyze: ";
-    std::string input;
-    std::getline(std::cin, input);
-
-    // Parse games from JSON file
-    auto games = analyzer.parseGameFile("C:\\Users\\Win11\\source\\repos\\CMakeProject3\\CMakeProject3\\game_information" + input + ".json");
-
-    if (games.empty()) {
-        std::cout << "No games found in game_information" + input + ".json" << std::endl;
-        return 1;
-    }
-
-    std::cout << "Found " << games.size() << " games" << std::endl;
-
-    // Analyze each game
-    for (const auto& game : games) {
-        auto start_time = std::chrono::high_resolution_clock::now();
-
-        analyzer.analyzeGame(game);
-
-        /*
-        auto end_time = std::chrono::high_resolution_clock::now();
-
-        auto duration = end_time - start_time;
-
-        std::cout << "Execution time: "
-            << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()
-            << " ms" << std::endl;
-
+    for (int i = 0; i < 78; i++) {
         
-        std::cout << "\nPress Enter to analyze next game (or 'q' to quit): ";
-        std::string input;
-        std::getline(std::cin, input);
-        if (input == "q" || input == "quit") {
-            break;
+        // Parse games from JSON file
+        auto games = analyzer.parseGameFile("game_information" + std::to_string(i) + ".json");
+
+        if (games.empty()) {
+            std::cout << "No games found in game_information" + std::to_string(i) + ".json" << std::endl;
+            return 1;
         }
-        */
-        
-        
+
+        std::cout << "Found " << games.size() << " games" << std::endl;
+
+        // Analyze each game
+        for (const auto& game : games) {
+
+
+            analyzer.analyzeGame(game);
+
+
+        }
+
     }
+    
 
     return 0;
 }
