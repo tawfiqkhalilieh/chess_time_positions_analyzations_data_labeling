@@ -16,25 +16,24 @@ RUN apt-get update && \
         libssl-dev \
         nlohmann-json3-dev \
         libcpprest-dev \
-        libboost-all-dev \
-        libmongoc-dev \
-        libbson-dev \
         libsasl2-dev \
         zlib1g-dev \
-        curl && \
+        curl \
+        ca-certificates \
+        python3 && \
     rm -rf /var/lib/apt/lists/*
 
 # Install MongoDB C Driver (libmongoc) from source
-RUN wget https://github.com/mongodb/mongo-c-driver/releases/download/1.24.3/mongo-c-driver-1.24.3.tar.gz && \
-    tar -xzf mongo-c-driver-1.24.3.tar.gz && \
-    cd mongo-c-driver-1.24.3 && \
+RUN curl -OL https://github.com/mongodb/mongo-c-driver/releases/download/1.27.6/mongo-c-driver-1.27.6.tar.gz && \
+    tar -xzf mongo-c-driver-1.27.6.tar.gz && \
+    cd mongo-c-driver-1.27.6 && \
     mkdir cmake-build && \
     cd cmake-build && \
     cmake .. -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF && \
     make && \
     make install && \
     cd / && \
-    rm -rf mongo-c-driver-1.24.3*
+    rm -rf mongo-c-driver-1.27.6*
 
 # Install MongoDB C++ Driver (libmongocxx) from source
 RUN git clone --branch releases/stable https://github.com/mongodb/mongo-cxx-driver.git /mongo-cxx-driver && \
@@ -56,17 +55,17 @@ RUN wget https://raw.githubusercontent.com/yhirose/cpp-httplib/master/httplib.h 
 COPY app/Database.hpp .
 COPY app/ok_api.cpp .
 COPY app/stockfish .
+RUN chmod +x stockfish
 
 # Compile the C++ code
 RUN g++ -o ok_api ok_api.cpp \
     -std=c++17 \
     -I/usr/local/include/mongocxx/v_noabi \
     -I/usr/local/include/bsoncxx/v_noabi \
+    -I/usr/local/include/libmongoc-1.0 \
+    -I/usr/local/include/libbson-1.0 \
+    -L/usr/local/lib \
     -lcpprest \
-    -lboost_system \
-    -lboost_thread \
-    -lboost_chrono \
-    -lboost_random \
     -lssl \
     -lcrypto \
     -lmongocxx \

@@ -21,6 +21,10 @@
 #include <signal.h>
 #include <csignal>
 #include <atomic>
+#include <queue>
+#include <functional>
+#include <mutex>
+#include <condition_variable>
 #include "Database.hpp"
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
@@ -37,9 +41,12 @@ std::atomic<bool> running(true);
 
 bool callArbiter(const std::string& requestID, int maxRetries = 5, int waitSeconds = 2) {
     httplib::Client client("arbiter-api", 8000); // use service name and container port
+    httplib::Headers headers = {
+        {"x-key", "taw"}
+    };
 
     for (int attempt = 1; attempt <= maxRetries; ++attempt) {
-        auto res = client.Post(("/models/create/" + requestID).c_str(), "", "application/json");
+        auto res = client.Post(("/models/create/" + requestID).c_str(), headers, "", "application/json");
 
         if (res && res->status >= 200 && res->status < 300) {
             std::cout << "Successfully called arbiter-api! Status: " << res->status << std::endl;
@@ -581,8 +588,8 @@ private:
     }
 
 public:
-    bool init() {
-        return engine.init();
+    bool init(const std::string& path = "stockfish") {
+        return engine.init(path);
     }
 
     std::vector<GameData> parseGameFile(const std::string& filename) {
@@ -805,7 +812,14 @@ public:
         }
 
         // Insert them all at once
-        auto resultk = coll.insert_many(docs);
+        try {
+            if (!docs.empty()) {
+                auto resultk = coll.insert_many(docs);
+                std::cout << "Successfully inserted " << docs.size() << " positions for game: " << game.gameId << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Error inserting positions into MongoDB: " << e.what() << std::endl;
+        }
     }
 };
 
@@ -847,8 +861,8 @@ void extractStringVector(const bsoncxx::document::view& doc_view, const std::str
 void longTask(std::string id) {
     GameAnalyzer analyzer;
 
-    if (!analyzer.init()) {
-        std::cout << "Error: Stockfish not found. Make sure stockfish.exe is available." << std::endl;
+    if (!analyzer.init("./stockfish")) {
+        std::cout << "Error: Stockfish not found. Make sure stockfish is available." << std::endl;
     } else {
         std::cout << "Stockfish is ready!." << std::endl;
 
